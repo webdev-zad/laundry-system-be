@@ -1,0 +1,109 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("staff")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tasks     Task[]
+}
+
+model Customer {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  email     String   @unique
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tasks     Task[]
+  loyaltyAccount LoyaltyAccount?
+}
+
+model Task {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  status      String   @default("todo") // todo, in-progress, done, delivery
+  priority    String   @default("medium") // low, medium, high
+  dueDate     DateTime
+  items       Int      @default(1)
+  
+  // New fields for pricing and payment
+  weight      Float?   // Weight in kilograms
+  hasBlankets Boolean  @default(false)
+  blanketCount Int     @default(0)
+  isPaid      Boolean  @default(false)
+  totalPrice  Float?   // Calculated total price
+  serviceType String?  // Keep this field for the service type
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  customerId  String   @db.ObjectId
+  customer    Customer @relation(fields: [customerId], references: [id])
+  assignedToId String? @db.ObjectId
+  assignedTo  User?    @relation(fields: [assignedToId], references: [id])
+}
+
+model LoyaltyAccount {
+  id             String               @id @default(auto()) @map("_id") @db.ObjectId
+  customerId     String               @unique @db.ObjectId
+  customer       Customer             @relation(fields: [customerId], references: [id])
+  points         Int                  @default(0)
+  lifetimePoints Int                  @default(0)
+  tier           String               @default("bronze") // bronze, silver, gold, platinum
+  joinDate       DateTime             @default(now())
+  redeemedRewards RedeemedReward[]
+  pointsHistory  LoyaltyPointsHistory[]
+}
+
+model LoyaltyReward {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String
+  pointsCost  Int
+  type        String           // discount, freeService, gift
+  expiryDays  Int              @default(30)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  redeemedBy  RedeemedReward[]
+}
+
+model RedeemedReward {
+  id               String         @id @default(auto()) @map("_id") @db.ObjectId
+  loyaltyAccountId String         @db.ObjectId
+  loyaltyAccount   LoyaltyAccount @relation(fields: [loyaltyAccountId], references: [id])
+  rewardId         String         @db.ObjectId
+  reward           LoyaltyReward  @relation(fields: [rewardId], references: [id])
+  pointsCost       Int
+  redeemedAt       DateTime       @default(now())
+  expiresAt        DateTime?
+  isUsed           Boolean        @default(false)
+  usedAt           DateTime?
+}
+
+model LoyaltyPointsHistory {
+  id               String         @id @default(auto()) @map("_id") @db.ObjectId
+  loyaltyAccountId String         @db.ObjectId
+  loyaltyAccount   LoyaltyAccount @relation(fields: [loyaltyAccountId], references: [id])
+  points           Int            // Can be positive (earned) or negative (spent)
+  type             String         // earned, redeemed, expired, adjusted
+  description      String?
+  createdAt        DateTime       @default(now())
+  relatedTaskId    String?        @db.ObjectId
+} 
